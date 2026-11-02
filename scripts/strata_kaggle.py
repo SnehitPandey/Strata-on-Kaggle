@@ -28,10 +28,40 @@ DEFAULT_ACCESS_MODE = "lan"
 DEFAULT_NGROK_SECRET = "NGROK_AUTHTOKEN"
 MODEL_CACHE_FORMAT = "strata.model-cache.v1"
 RUNTIME_CACHE_FORMAT = "strata.runtime-cache.v1"
+DISK_SAFETY_MARGIN_GB = 8.0
 
 
 def log(message: str) -> None:
     print("[Strata] " + message, flush=True)
+
+
+def disk_free_gb(path: Path) -> float | None:
+    """Free space on the filesystem holding `path`, in decimal GB, or None if it cannot be read."""
+    try:
+        return shutil.disk_usage(path).free / 1e9
+    except OSError:
+        return None
+
+
+def check_download_fits(data_dir: Path, download_gb: float | None,
+                        margin_gb: float = DISK_SAFETY_MARGIN_GB) -> None:
+    """Stop before a first-run download that cannot fit on the Kaggle notebook disk."""
+    if download_gb is None or download_gb <= 0:
+        return
+    free_gb = disk_free_gb(data_dir)
+    if free_gb is None:
+        return
+    needed_gb = download_gb + margin_gb
+    if free_gb >= needed_gb:
+        return
+    raise RuntimeError(
+        f"Not enough free disk: {free_gb:.1f} GB free, about {needed_gb:.1f} GB needed "
+        f"({download_gb:.1f} GB download + {margin_gb:.0f} GB scratch/reserve). "
+        "Kaggle notebooks usually provide about 57.6 GiB of ephemeral disk, while the Gyro-S "
+        "model alone is 58.5 GB. Attach your private model and runtime datasets in Add Input "
+        "and set MODEL_RESTORE_MODE='symlink' so the model is read from /kaggle/input instead "
+        "of downloaded or copied. Nothing was downloaded."
+    )
 
 
 def redact(text: str) -> str:
@@ -575,8 +605,15 @@ def restore_model_cache(owner: str, slug: str, data_dir: Path, workers: int = 8,
     if not entries:
         raise RuntimeError("Model cache manifest is empty.")
     total = sum(int(e["size"]) for e in entries)
-    log("Restoring " + str(len(entries)) + " model files (" + f"{total / (1024**3):.2f} GiB" + ") using " + restore_mode + " mode.")
     data_dir.mkdir(parents=True, exist_ok=True)
+    if restore_mode == "copy":
+        free_gb = disk_free_gb(data_dir)
+        needed_gb = total / 1e9 + 2.0
+        if free_gb is not None and free_gb < needed_gb:
+            log(f"Copy restore needs about {needed_gb:.1f} GB but only {free_gb:.1f} GB is free; "
+                "using symlink mode instead so the model is not duplicated onto this disk.")
+            restore_mode = "symlink"
+    log("Restoring " + str(len(entries)) + " model files (" + f"{total / (1024**3):.2f} GiB" + ") using " + restore_mode + " mode.")
 
     validated: list[tuple[Path, Path, int]] = []
     for item in entries:
@@ -608,9 +645,28 @@ def restore_model_cache(owner: str, slug: str, data_dir: Path, workers: int = 8,
                 if dst.is_file() and dst.stat().st_size == size:
                     # Keep a valid existing local copy rather than replacing it with a link.
                     continue
-                raise RuntimeError("Restore target already exists with unexpected content: " + str(dst))
+                if dst.is_file():
+                    # A failed/partial download can leave a truncated file here; the dataset
+                    # copy was just size-checked, so replace the bad file and reclaim the space.
+                    log("Replacing an incomplete local model file with a verified dataset link: " + str(dst))
+                    dst.unlink()
+                else:
+                    raise RuntimeError("Restore target already exists with unexpected content: " + str(dst))
             dst.symlink_to(src.resolve())
             created += 1
+        partials = [p for p in data_dir.rglob("*.part") if p.is_file()]
+        if partials:
+            reclaimed = sum(p.stat().st_size for p in partials)
+            removed = 0
+            for part in partials:
+                try:
+                    part.unlink()
+                    removed += 1
+                except OSError:
+                    pass
+            if removed:
+                log(f"Removed {removed} stale partial download(s), reclaiming "
+                    f"{reclaimed / (1024**3):.2f} GiB.")
         log(f"Model cache linked without copying model bytes: {created} links created, {already_linked} already linked.")
         log("Note: Kaggle still stages the attached input dataset; symlink mode avoids only the extra copy to local storage.")
         return True
@@ -724,6 +780,27 @@ def _model_source_args(data_dir: Path, family: str, variant: str) -> list[str]:
         log("Using local model files at " + str(cached) + " (avoiding a new model download).")
         return ["--model-path", str(cached)]
     return ["--data-dir", str(data_dir)]
+
+
+def plan_download_gb(family: str, variant: str, context: str, vision: str,
+                     gpu_list: str, data_dir: Path,
+                     access_mode: str = DEFAULT_ACCESS_MODE) -> float | None:
+    """Ask Strata's machine-readable plan how much it would download, or None if unavailable."""
+    cmd = ["strata", "launch", "--plan", "--family", family, "--model", variant,
+           *_model_source_args(data_dir, family, variant), "--context", context, "--vision", vision,
+           "--mtp", "off", "--tune", "skip", "--access", access_mode,
+           "--port", str(STRATA_PORT), "--gpu", gpu_list, "--output", "json"]
+    try:
+        result = subprocess.run(cmd, text=True, stdout=subprocess.PIPE,
+                                stderr=subprocess.DEVNULL, timeout=180, check=False)
+        if result.returncode != 0 or not (result.stdout or "").strip():
+            return None
+        payload = json.loads(result.stdout)
+        download = (payload.get("plan") or {}).get("download") or {}
+        value = download.get("gb")
+        return float(value) if value is not None else None
+    except (OSError, ValueError, TypeError, AttributeError, subprocess.SubprocessError):
+        return None
 
 
 def run_plan(family: str, variant: str, context: str, vision: str,

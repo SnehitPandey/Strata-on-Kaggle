@@ -61,12 +61,12 @@ The benefit is **persistence and reuse**: future sessions can restore from your 
 
 ## 🧭 Quick links
 
-[![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://kaggle.com/kernels/welcome?src=https://github.com/iAmAjayTeli/strata-kaggle/blob/main/notebooks/Strata_Kaggle.ipynb)
+[![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://kaggle.com/kernels/welcome?src=https://github.com/SnehitPandey/Strata-on-Kaggle/blob/main/notebooks/Strata_Kaggle.ipynb)
 
 If the badge does not open the notebook import flow, go to [Kaggle Notebooks](https://www.kaggle.com/notebooks/welcome), choose **Load from URL**, and paste:
 
 ```text
-https://github.com/iAmAjayTeli/strata-kaggle/blob/main/notebooks/Strata_Kaggle.ipynb
+https://github.com/SnehitPandey/Strata-on-Kaggle/blob/main/notebooks/Strata_Kaggle.ipynb
 ```
 
 Opening the notebook imports its code; it does **not** grant access to anyone else's private datasets or secrets.
@@ -169,9 +169,9 @@ VISION = "off"
 GPU_IDS = ""  # blank = auto-detect visible GPUs
 MODEL_DATA_DIR = "/root/strata-local"
 
-# "copy" uses extra local disk/time but may improve local reads (default for this tutorial).
-# Use "symlink" to avoid the second local copy; input-mount reads may be slower.
-MODEL_RESTORE_MODE = "copy"
+# "symlink" avoids a second ~80-GiB local copy by reading the attached dataset (default).
+# Use "copy" only when the whole cache fits in free disk space; it may improve local reads.
+MODEL_RESTORE_MODE = "symlink"
 
 UPLOAD_CACHES = True
 I_CONFIRM_MODEL_LICENSE_AND_PRIVATE_STORAGE = False
@@ -256,12 +256,18 @@ The model dataset uses a `manifest.json`; the runtime dataset contains `strata-r
 
 The notebook verifies the manifest and file sizes, then uses the `MODEL_RESTORE_MODE` option:
 
-- `"copy"` (default for this tutorial): copies the model files into `/root/strata-local`. This takes extra restore time and disk space, but may provide faster local file access.
-- `"symlink"`: creates links in `/root/strata-local` to the attached read-only Kaggle dataset, avoiding the second full local copy. Reads from the input mount may be slower.
+- `"symlink"` (default): creates links in `/root/strata-local` to the attached read-only Kaggle dataset, avoiding a second full local copy. Reads from the input mount may be slower.
+- `"copy"`: copies the model files into `/root/strata-local`. This takes extra restore time and disk space, but may provide faster local file access. The helper automatically falls back to `"symlink"` when the full copy would not fit.
 
 **Why Add Input can still show a download progress bar:** Kaggle must make the selected dataset files available to the fresh runtime; this is a transfer from your Kaggle Dataset storage into that notebook session, not the same as downloading the model again from its original model host. No notebook option can eliminate this input-staging step.
 
-With `MODEL_RESTORE_MODE = "copy"` (the notebook default), the helper copies files into `/root/strata-local`, using extra restore time and disk space but potentially improving local-read performance. With `MODEL_RESTORE_MODE = "symlink"`, the helper creates links to the attached read-only `/kaggle/input` files and avoids the second full local copy, but reading from the mount may be slower. In either mode, wait for Kaggle's input staging and the restore cell to finish before launching Strata. The goal is to avoid downloading the model from its original host again—not to eliminate every transfer.
+With `MODEL_RESTORE_MODE = "symlink"` (the notebook default), the helper creates links to the attached read-only `/kaggle/input` files and avoids the second full local copy. With `MODEL_RESTORE_MODE = "copy"`, the helper copies files into `/root/strata-local`, using extra restore time and disk space but potentially improving local-read performance; it switches to symlink mode automatically when the copy would not fit. In either mode, wait for Kaggle's input staging and the restore cell to finish before launching Strata. The goal is to avoid downloading the model from its original host again—not to eliminate every transfer.
+
+### First runs may not fit Kaggle's ephemeral disk
+
+A standard Kaggle notebook exposes about **57.6 GiB** of ephemeral disk. The Gyro-S download alone is **58.5 GB (54.5 GiB)**, and Strata still needs the prepared pack and other supporting files. A first-run download therefore cannot finish on the standard disk, even though the main file may appear to reach 100%. The notebook now asks Strata's plan for the download size and stops with a clear message instead of filling the disk.
+
+Use an attached private model cache with `MODEL_RESTORE_MODE = "symlink"` (the default) to read the model from `/kaggle/input` without copying it. Do not use `"copy"` unless the whole cache fits in free space.
 
 Runtime caches may not be compatible after a Strata, engine, OS, CUDA, or GPU change. Review the plan again and allow Strata to fetch a compatible component when needed.
 
@@ -322,6 +328,8 @@ Unit tests do not replace a clean Kaggle integration test. Validate first run, p
 ## 🤝 Contributing
 
 Please report the Strata version, GPU, whether it was first run or cache restore, and the error with secrets removed. Never attach model files, credentials, or sensitive notebook output to issues.
+
+**Maintainer:** [Snehit Pandey](https://github.com/SnehitPandey). This work builds on the original [Strata on Kaggle project by DevZoneX (@iAmAjayTeli)](https://github.com/iAmAjayTeli/devzonex-strata-kaggle).
 
 ## 📄 License
 

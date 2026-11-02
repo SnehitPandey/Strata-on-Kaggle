@@ -21,6 +21,8 @@ from scripts.strata_kaggle import (
     _copy_verified,
     launch_strata,
     run_plan,
+    plan_download_gb,
+    check_download_fits,
     start_ngrok_tunnel,
     MODEL_CACHE_FORMAT,
     RUNTIME_CACHE_FORMAT,
@@ -251,6 +253,111 @@ class StrataKaggleTests(unittest.TestCase):
             self.assertTrue(linked.is_symlink())
             self.assertEqual(linked.read_bytes(), payload)
             self.assertEqual(linked.resolve(), flattened.resolve())
+
+    @unittest.skipIf(os.name != "posix", "symlink restore is validated on the Kaggle/Linux runtime")
+    def test_restore_model_cache_copy_falls_back_to_symlink_when_disk_is_full(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            input_root = root / "input" / "datasets"
+            dataset = input_root / "test-owner" / "strata-model-gyro-gyro-s"
+            dataset.mkdir(parents=True)
+            payload = b"model-bytes"
+            flattened = dataset / "0001__model.gguf"
+            flattened.write_bytes(payload)
+            manifest = {
+                "format": "strata.model-cache.v1",
+                "model": {"family": "gyro", "variant": "gyro-s"},
+                "files": [{
+                    "dataset_name": flattened.name,
+                    "relative_path": "models/gyro-Gyro-S/model.gguf",
+                    "size": len(payload),
+                }],
+            }
+            (dataset / "manifest.json").write_text(
+                __import__("json").dumps(manifest), encoding="utf-8"
+            )
+            target_root = root / "local-model"
+            with patch("scripts.strata_kaggle.INPUT_ROOT", input_root):
+                with patch("scripts.strata_kaggle.disk_free_gb", return_value=0.5):
+                    restored = restore_model_cache(
+                        "test-owner", "strata-model-gyro-gyro-s", target_root,
+                        family="gyro", variant="gyro-s", restore_mode="copy",
+                    )
+            linked = target_root / "models" / "gyro-Gyro-S" / "model.gguf"
+            self.assertTrue(restored)
+            self.assertTrue(linked.is_symlink())
+            self.assertEqual(linked.read_bytes(), payload)
+
+    @unittest.skipIf(os.name != "posix", "symlink restore is validated on the Kaggle/Linux runtime")
+    def test_restore_model_cache_symlink_replaces_incomplete_local_file(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            input_root = root / "input" / "datasets"
+            dataset = input_root / "test-owner" / "strata-model-gyro-gyro-s"
+            dataset.mkdir(parents=True)
+            payload = b"complete-model"
+            (dataset / "0001__model.gguf").write_bytes(payload)
+            manifest = {
+                "format": "strata.model-cache.v1",
+                "model": {"family": "gyro", "variant": "gyro-s"},
+                "files": [{
+                    "dataset_name": "0001__model.gguf",
+                    "relative_path": "models/gyro-Gyro-S/model.gguf",
+                    "size": len(payload),
+                }],
+            }
+            (dataset / "manifest.json").write_text(
+                __import__("json").dumps(manifest), encoding="utf-8"
+            )
+            target_root = root / "local-model"
+            stale = target_root / "models" / "gyro-Gyro-S" / "model.gguf"
+            stale.parent.mkdir(parents=True)
+            stale.write_bytes(b"short")
+            partial = stale.with_name(stale.name + ".part")
+            partial.write_bytes(b"incomplete-download")
+            with patch("scripts.strata_kaggle.INPUT_ROOT", input_root):
+                restored = restore_model_cache(
+                    "test-owner", "strata-model-gyro-gyro-s", target_root,
+                    family="gyro", variant="gyro-s", restore_mode="symlink",
+                )
+            self.assertTrue(restored)
+            self.assertTrue(stale.is_symlink())
+            self.assertEqual(stale.read_bytes(), payload)
+            self.assertFalse(partial.exists())
+
+    def test_check_download_fits_blocks_when_disk_is_small(self):
+        with patch("scripts.strata_kaggle.disk_free_gb", return_value=50.0):
+            with self.assertRaises(RuntimeError) as context:
+                check_download_fits(Path("/tmp/model"), 58.5)
+        self.assertIn("symlink", str(context.exception))
+
+    def test_check_download_fits_allows_when_disk_is_large(self):
+        with patch("scripts.strata_kaggle.disk_free_gb", return_value=120.0):
+            check_download_fits(Path("/tmp/model"), 58.5)
+
+    def test_check_download_fits_skips_when_nothing_is_downloaded(self):
+        with patch("scripts.strata_kaggle.disk_free_gb", return_value=1.0):
+            check_download_fits(Path("/tmp/model"), 0.0)
+
+    def test_plan_download_gb_reads_machine_plan(self):
+        class Result:
+            returncode = 0
+            stdout = '{"schema_version": 1, "ok": true, "plan": {"download": {"gb": 58.5}}}'
+
+        with patch("scripts.strata_kaggle.subprocess.run", return_value=Result()):
+            with patch("scripts.strata_kaggle._model_source_args", return_value=[]):
+                value = plan_download_gb("gyro", "gyro-s", "200k", "off", "0", Path("/tmp/model"))
+        self.assertEqual(value, 58.5)
+
+    def test_plan_download_gb_returns_none_on_bad_output(self):
+        class Result:
+            returncode = 0
+            stdout = "not json"
+
+        with patch("scripts.strata_kaggle.subprocess.run", return_value=Result()):
+            with patch("scripts.strata_kaggle._model_source_args", return_value=[]):
+                value = plan_download_gb("gyro", "gyro-s", "200k", "off", "0", Path("/tmp/model"))
+        self.assertIsNone(value)
 
     def test_context_window_tokens(self):
         self.assertEqual(context_window_tokens("32k"), 32 * 1024)

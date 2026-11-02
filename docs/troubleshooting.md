@@ -22,10 +22,16 @@ If the cached Strata/engine build doesn't match the runtime, the helper may skip
 
 Attach your private model dataset. It should contain `manifest.json` and numbered flattened files. The notebook uses the manifest to reconstruct the model paths.
 
-- `MODEL_RESTORE_MODE = "copy"` (notebook default) copies files into `/root/strata-local`. It takes extra restore time/disk space but may improve local model reads.
-- `MODEL_RESTORE_MODE = "symlink"` links to the mounted, read-only Kaggle input files, avoiding a second full local copy. Direct reads may be slower.
+- `MODEL_RESTORE_MODE = "symlink"` (notebook default) links to the mounted, read-only Kaggle input files, avoiding a second full local copy. Direct reads may be slower.
+- `MODEL_RESTORE_MODE = "copy"` copies files into `/root/strata-local`. It takes extra restore time/disk space but may improve local model reads. The helper switches to symlink mode automatically if the full copy does not fit.
 
 **Why Add Input shows a download percentage:** Kaggle stages the attached dataset into the new runtime. For an 80-GiB model it can show progress such as `Downloaded 14/16 files: 4.5 GiB / 79.94 GiB`. This is a transfer from your Kaggle Dataset storage, not necessarily a download from the original model host. Wait until staging and the restore cell finish. If the model cache restore returns `False`, verify that the dataset slug, username and manifest match your configuration before running Strata.
+
+## Disk fills during the first model download
+
+A standard Kaggle notebook has about 57.6 GiB of ephemeral disk. The Gyro-S file alone is 58.5 GB (54.5 GiB), so the first-run download and Strata's prepared pack cannot fit. The download may appear to finish while the disk indicator is already at its limit, and Strata then stalls while preparing the pack.
+
+Attach your private model cache in **Add Input** and keep `MODEL_RESTORE_MODE = "symlink"` (the default). The notebook reads the planned download size from `strata launch --plan --output json` and stops with a clear message before a download that cannot fit. If a previous attempt left files in `/root/strata-local`, attach the dataset and rerun; symlink mode reuses a valid local file or links the rest without copying.
 
 ## Cache upload appears frozen
 
