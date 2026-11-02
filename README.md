@@ -1,6 +1,5 @@
 # 🚀 Strata on Kaggle
 
-[![Tests](https://github.com/iAmAjayTeli/strata-kaggle/actions/workflows/tests.yml/badge.svg)](https://github.com/iAmAjayTeli/strata-kaggle/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Kaggle%20GPU-20BEFF)
 ![Status](https://img.shields.io/badge/status-experimental-orange)
