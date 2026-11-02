@@ -4,7 +4,7 @@
   <desc id="desc">Strata loaded Qwen3.8 Flash Next Gyro-S on two Tesla T4 GPUs, its local health endpoint reported loaded true, a temporary ngrok URL was registered, and private model/runtime cache datasets were created. Fresh-session restore is still being validated.</desc>
   <rect width="1000" height="410" rx="22" fill="#f7f4ee"/>
   <text x="32" y="42" font-family="Inter,Arial,sans-serif" font-size="22" font-weight="700" fill="#252321">Observed first-run results</text>
-  <text x="32" y="66" font-family="Inter,Arial,sans-serif" font-size="13" fill="#65615b">Values from the maintainer's manual Kaggle run · not a guarantee for every account or GPU</text>
+  <text x="32" y="66" font-family="Inter,Arial,sans-serif" font-size="13" fill="#65615b">Values from my manual Kaggle run · not a guarantee for every account or GPU</text>
   <rect x="30" y="91" width="460" height="126" rx="16" fill="#252321"/>
   <text x="54" y="124" font-family="Inter,Arial,sans-serif" font-size="12" letter-spacing="1.2" fill="#bdb6ab">MODEL</text>
   <text x="54" y="154" font-family="Inter,Arial,sans-serif" font-size="19" font-weight="700" fill="#ffffff">Qwen3.8-Flash-Next Gyro-S</text>
