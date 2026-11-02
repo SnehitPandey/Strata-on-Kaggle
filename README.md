@@ -3,7 +3,6 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Kaggle%20GPU-20BEFF)
 ![Status](https://img.shields.io/badge/status-experimental-orange)
-[![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://kaggle.com/kernels/welcome?src=https://github.com/iAmAjayTeli/strata-kaggle/blob/main/notebooks/Strata_Kaggle.ipynb)
 
 **Run a Strata-supported model on a Kaggle GPU, cache the model and Strata runtime in your own private Kaggle Datasets, and connect OpenCode Desktop through an authenticated ngrok HTTPS tunnel.**
 
