@@ -1,5 +1,4 @@
 # 🚀 Strata on Kaggle
-
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Kaggle%20GPU-20BEFF)
 ![Status](https://img.shields.io/badge/status-experimental-orange)
@@ -99,7 +98,7 @@ These are **workflow/results illustrations**, not raw UI screenshots. The screen
 - **Remote tunnel and API security:** the ngrok tunnel connected; the public API rejected a request without a key, and the authenticated API test succeeded.
 - **Model cache upload:** Kaggle showed a private Version 1 model dataset of approximately 85.83 GB with the model and support files.
 - **Runtime cache upload:** Kaggle showed a private Version 2 runtime dataset of approximately 1.36 GB with the archive, checksum, and manifest.
-- **Fresh-session restore and OpenCode:** After attaching the private model/runtime datasets in a fresh Kaggle run, Strata launched and OpenCode connected and returned responses successfully.
+- **Fresh-session restore and OpenCode:** my manual run confirmed that, after attaching the private model/runtime datasets in a fresh Kaggle run, Strata launched and OpenCode connected and returned responses successfully.
 - **Live progress:** Copy-mode model restoration reports live bytes/GiB restored, percentage, completed files, active copies, throughput, and elapsed time. Strata launch and Kaggle upload helpers also stream command output and print periodic status when a process is quiet.
 
 ### Still to validate across more environments

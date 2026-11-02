@@ -6,4 +6,4 @@
 - The Strata public endpoint must reject requests without a bearer key (HTTP 401/403) before OpenCode use.
 - ngrok tunnel URLs are public. Keep both the ngrok authtoken and Strata API key private, and stop the tunnel when finished.
 - Verify every model's license and upstream terms before uploading model files, even to a private dataset.
-- Report security issues privately to the repository rather than opening a public issue with secrets or personally identifying information.
+- Report security issues privately to me rather than opening a public issue with secrets or personally identifying information.
