@@ -263,11 +263,11 @@ The notebook verifies the manifest and file sizes, then uses the `MODEL_RESTORE_
 
 With `MODEL_RESTORE_MODE = "symlink"` (the notebook default), the helper creates links to the attached read-only `/kaggle/input` files and avoids the second full local copy. With `MODEL_RESTORE_MODE = "copy"`, the helper copies files into `/root/strata-local`, using extra restore time and disk space but potentially improving local-read performance; it switches to symlink mode automatically when the copy would not fit. In either mode, wait for Kaggle's input staging and the restore cell to finish before launching Strata. The goal is to avoid downloading the model from its original host again—not to eliminate every transfer.
 
-### First runs may not fit Kaggle's ephemeral disk
+### Kaggle's disk indicator can exceed its displayed maximum
 
-A standard Kaggle notebook exposes about **57.6 GiB** of ephemeral disk. The Gyro-S download alone is **58.5 GB (54.5 GiB)**, and Strata still needs the prepared pack and other supporting files. A first-run download therefore cannot finish on the standard disk, even though the main file may appear to reach 100%. The notebook now asks Strata's plan for the download size and stops with a clear message instead of filling the disk.
+The Kaggle UI may show **83.4 GiB** used against **Max 57.6 GiB** while a Gyro-S run is healthy. In a tested T4 ×2 private-BYOD run, Strata wrote **79.94 GiB** to `/root/strata-local` and completed the download, expert packing, model load, and authenticated API test. The displayed maximum was not a hard limit for `/root` in that runtime; `/root` sits on the larger host overlay that `df` reports (about 8.0 TiB with ~1.1 TiB free). The notebook's `check_download_fits` uses the actual free space for `MODEL_DATA_DIR`, not the UI maximum, so do not add a hard 57.6-GiB cap—it would block a working first run.
 
-Use an attached private model cache with `MODEL_RESTORE_MODE = "symlink"` (the default) to read the model from `/kaggle/input` without copying it. Do not use `"copy"` unless the whole cache fits in free space.
+If a download genuinely does not fit, attach a private model cache with `MODEL_RESTORE_MODE = "symlink"` (the default) to read the model from `/kaggle/input` without copying it. Do not use `"copy"` unless the whole cache fits in free space.
 
 Runtime caches may not be compatible after a Strata, engine, OS, CUDA, or GPU change. Review the plan again and allow Strata to fetch a compatible component when needed.
 
@@ -276,12 +276,13 @@ Runtime caches may not be compatible after a Strata, engine, OS, CUDA, or GPU ch
 # 🖥️ Connect OpenCode Desktop
 
 1. Copy the **current** HTTPS URL printed by the notebook.
-2. In the Kaggle shell, retrieve the API key privately with `strata launch --show-key`. Do not include it in notebook output or chat.
+2. In the Kaggle terminal or a private notebook cell, retrieve the API key with `strata launch --show-key`. Clear it from any shared notebook output and never commit it.
 3. On Windows, save it locally as `%USERPROFILE%\.config\opencode\strata-key.txt`.
-4. Merge the printed provider snippet into the existing top-level `providers` object in `opencode.jsonc`. Don't overwrite other provider or MCP settings.
-5. Set the model to the provider/model ID printed by the notebook, restart OpenCode, and test in a fresh session.
+4. Merge the printed `provider.strata` entry into the existing top-level `provider` object in `opencode.jsonc`. It must use `npm: "@ai-sdk/openai-compatible"` and `options` (not a top-level `strata` block or `settings`). Don't overwrite other providers or MCP settings.
+5. Set the top-level `model` to `strata/<model-id>`, restart OpenCode, and test in a fresh session.
+6. Strata generates a new API key when it restarts. Update `strata-key.txt` after each fresh launch; the key stays stable while the same server is running.
 
-Keep the Kaggle runtime and tunnel running while using OpenCode. ngrok URLs are public endpoints and can change on restart unless you configure a reserved/static domain. Anyone who obtains the URL can reach the endpoint, so API-key enforcement is required. Update the OpenCode base URL after every tunnel change.
+Keep the Kaggle runtime and tunnel running while using OpenCode. ngrok URLs are public endpoints and can change on restart unless you configure a reserved/static domain. Anyone who obtains the URL can reach the endpoint, so API-key enforcement is required. Update the OpenCode base URL and key after every tunnel/Strata restart.
 
 ---
 

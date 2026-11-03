@@ -45,3 +45,6 @@ Thumbs.db
 *.bin
 strata-local/
 cache/
+
+#custom
+session.txt

@@ -27,11 +27,11 @@ Attach your private model dataset. It should contain `manifest.json` and numbere
 
 **Why Add Input shows a download percentage:** Kaggle stages the attached dataset into the new runtime. For an 80-GiB model it can show progress such as `Downloaded 14/16 files: 4.5 GiB / 79.94 GiB`. This is a transfer from your Kaggle Dataset storage, not necessarily a download from the original model host. Wait until staging and the restore cell finish. If the model cache restore returns `False`, verify that the dataset slug, username and manifest match your configuration before running Strata.
 
-## Disk fills during the first model download
+## Disk indicator is above the displayed maximum
 
-A standard Kaggle notebook has about 57.6 GiB of ephemeral disk. The Gyro-S file alone is 58.5 GB (54.5 GiB), so the first-run download and Strata's prepared pack cannot fit. The download may appear to finish while the disk indicator is already at its limit, and Strata then stalls while preparing the pack.
+The Kaggle UI may show `83.4 GiB` used against `Max 57.6 GiB` while the run is healthy. In a tested T4 ×2 private-BYOD run, `/root/strata-local` reached 79.94 GiB and the model loaded and answered. The UI maximum was not enforced for `/root`; the helper checks the real filesystem free space via `shutil.disk_usage(MODEL_DATA_DIR)`, which saw the larger host overlay. If the helper does not stop, let `Packing the experts...` finish; interrupting it can look like a stall.
 
-Attach your private model cache in **Add Input** and keep `MODEL_RESTORE_MODE = "symlink"` (the default). The notebook reads the planned download size from `strata launch --plan --output json` and stops with a clear message before a download that cannot fit. If a previous attempt left files in `/root/strata-local`, attach the dataset and rerun; symlink mode reuses a valid local file or links the rest without copying.
+If the helper does stop, attach your private model cache in **Add Input** and keep `MODEL_RESTORE_MODE = "symlink"` (the default). The notebook reads the planned download size from `strata launch --plan --output json` and stops with a clear message before a download that cannot fit. If a previous attempt left files in `/root/strata-local`, attach the dataset and rerun; symlink mode reuses a valid local file or links the rest without copying.
 
 ## Cache upload appears frozen
 
@@ -55,7 +55,7 @@ Check that the Kaggle Secret is named exactly `KAGGLE_API_TOKEN`, notebook acces
 
 The public `/v1/models` endpoint must reject unauthenticated requests with HTTP `401` or `403`. Do not continue using a public tunnel if the unauthenticated request succeeds. Check Strata's access mode and keep `STRATA_ACCESS_MODE = "lan"` so Strata generates an API key.
 
-Never paste the API key into notebook output, GitHub, issues, or chat.
+You can retrieve the key in a private notebook cell; clear it from the output before sharing the notebook. Never commit or post the key.
 
 ## ngrok tunnel fails, times out, or changes
 
@@ -63,7 +63,7 @@ The tunnel exists only while the Kaggle session is active. If `ngrok` cannot con
 
 ## OpenCode returns 401 or hangs
 
-- For `401`, check the local key file and OpenCode provider settings without printing the key.
+- For `401`, check the local key file and OpenCode provider settings without printing the key. Strata generates a new key when it restarts; rerun `strata launch --show-key` and update the key file.
 - Test the authenticated `/v1/models` and `/v1/chat/completions` endpoints independently before troubleshooting OpenCode.
 - Confirm the configured context/output limits match the running Strata model. After changing compaction/provider settings, start a fresh OpenCode session.
 

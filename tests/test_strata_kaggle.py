@@ -371,16 +371,17 @@ class StrataKaggleTests(unittest.TestCase):
         value = opencode_config_snippet("https://sample.ngrok-free.app", "qwen3.8-flash-next-gyro-gyro-s")
         import json
         parsed = json.loads(value)
-        self.assertIn("strata", parsed)
-        self.assertEqual(parsed["strata"]["settings"]["apiKey"], "{file:~/.config/opencode/strata-key.txt}")
+        self.assertIn("provider", parsed)
+        self.assertNotIn("strata", parsed)
+        strata = parsed["provider"]["strata"]
+        self.assertEqual(strata["npm"], "@ai-sdk/openai-compatible")
+        self.assertEqual(strata["options"]["apiKey"], "{file:~/.config/opencode/strata-key.txt}")
+        self.assertEqual(strata["options"]["headers"]["ngrok-skip-browser-warning"], "1")
         self.assertEqual(
-            parsed["strata"]["models"]["qwen3.8-flash-next-gyro-gyro-s"]["reasoningEffort"],
-            "none",
-        )
-        self.assertEqual(
-            parsed["strata"]["models"]["qwen3.8-flash-next-gyro-gyro-s"]["limit"]["context"],
+            strata["models"]["qwen3.8-flash-next-gyro-gyro-s"]["limit"]["context"],
             200 * 1024,
         )
+        self.assertTrue(strata["models"]["qwen3.8-flash-next-gyro-gyro-s"]["tool_call"])
         self.assertNotIn("sk-strata-", value)
 
     def test_open_code_snippet_accepts_context_override(self):
@@ -393,7 +394,7 @@ class StrataKaggleTests(unittest.TestCase):
                 output_tokens=4096,
             )
         )
-        limit = parsed["strata"]["models"]["model-id"]["limit"]
+        limit = parsed["provider"]["strata"]["models"]["model-id"]["limit"]
         self.assertEqual(limit, {"context": 32 * 1024, "output": 4096})
 
     def test_launch_strata_uses_configured_access_mode(self):

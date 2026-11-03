@@ -32,7 +32,7 @@ Attaching a dataset makes files available to a new Kaggle runtime. Kaggle may sh
 
 The notebook defaults to `MODEL_RESTORE_MODE = "symlink"`. It links to the attached dataset in `/kaggle/input` and avoids the second local copy; reads from the input mount may be slower. Set `MODEL_RESTORE_MODE = "copy"` only when the whole cache fits in free disk space: it copies model files to `/root/strata-local`, using extra restore time and space, but may improve local reads. The helper falls back to symlink mode automatically when a copy would not fit. Kaggle still stages the attached dataset into a new session in either mode.
 
-A standard Kaggle notebook has about 57.6 GiB of ephemeral disk. Gyro-S itself is 58.5 GB (54.5 GiB), so a first-run download cannot complete on that disk. Attach a private model cache and use symlink mode instead; the notebook checks the planned download size and stops before filling the disk.
+The Kaggle UI can show a disk figure above its displayed maximum: a tested T4 ×2 run stored 79.94 GiB in `/root/strata-local` while the UI showed `83.4 GiB / Max 57.6 GiB`, and the model loaded normally. The displayed maximum was not a hard limit for `/root` in that runtime; the helper checks the actual free space for `MODEL_DATA_DIR`. If a download genuinely does not fit, attach a private model cache and use symlink mode.
 
 No restore mode eliminates Kaggle's input staging or guarantees instant startup. The cache prevents the original-source model download when the attached files match the requested model; it does not turn the dataset into a permanently attached disk across all sessions.
 

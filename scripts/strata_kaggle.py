@@ -45,7 +45,7 @@ def disk_free_gb(path: Path) -> float | None:
 
 def check_download_fits(data_dir: Path, download_gb: float | None,
                         margin_gb: float = DISK_SAFETY_MARGIN_GB) -> None:
-    """Stop before a first-run download that cannot fit on the Kaggle notebook disk."""
+    """Stop before a download that cannot fit on the filesystem holding `data_dir`."""
     if download_gb is None or download_gb <= 0:
         return
     free_gb = disk_free_gb(data_dir)
@@ -57,10 +57,11 @@ def check_download_fits(data_dir: Path, download_gb: float | None,
     raise RuntimeError(
         f"Not enough free disk: {free_gb:.1f} GB free, about {needed_gb:.1f} GB needed "
         f"({download_gb:.1f} GB download + {margin_gb:.0f} GB scratch/reserve). "
-        "Kaggle notebooks usually provide about 57.6 GiB of ephemeral disk, while the Gyro-S "
-        "model alone is 58.5 GB. Attach your private model and runtime datasets in Add Input "
-        "and set MODEL_RESTORE_MODE='symlink' so the model is read from /kaggle/input instead "
-        "of downloaded or copied. Nothing was downloaded."
+        "This check uses the actual free space for MODEL_DATA_DIR; Kaggle's displayed disk "
+        "maximum can be lower than the real /root overlay. If space is genuinely low, attach "
+        "your private model and runtime datasets in Add Input and set "
+        "MODEL_RESTORE_MODE='symlink' so the model is read from /kaggle/input instead of "
+        "downloaded or copied. Nothing was downloaded."
     )
 
 
@@ -1158,18 +1159,23 @@ def context_window_tokens(context: str) -> int:
 
 
 def opencode_config_snippet(public_url: str, model_id: str,
-                            provider_package: str = "@opencode/ai/providers/openai-compatible",
+                            provider_package: str = "@ai-sdk/openai-compatible",
                             context_tokens: int = 200 * 1024,
                             output_tokens: int = 8192) -> str:
     provider = {
-        "name": "Strata Kaggle", "package": provider_package,
-        "settings": {"baseURL": public_url.rstrip("/") + "/v1",
-                     "apiKey": "{file:~/.config/opencode/strata-key.txt}",
-                     "encoding": "none", "timeout": 600000, "headerTimeout": 120000,
-                     "chunkTimeout": 300000},
-        "models": {model_id: {"name": model_id, "modelID": model_id,
-                              "reasoningEffort": "none",
-                              "capabilities": {"tools": True, "input": ["text"], "output": ["text"]},
-                              "limit": {"context": int(context_tokens), "output": int(output_tokens)}}},
+        "npm": provider_package,
+        "name": "Strata Kaggle",
+        "options": {
+            "baseURL": public_url.rstrip("/") + "/v1",
+            "apiKey": "{file:~/.config/opencode/strata-key.txt}",
+            "headers": {"ngrok-skip-browser-warning": "1"},
+        },
+        "models": {
+            model_id: {
+                "name": model_id,
+                "tool_call": True,
+                "limit": {"context": int(context_tokens), "output": int(output_tokens)},
+            }
+        },
     }
-    return json.dumps({"strata": provider}, indent=2)
+    return json.dumps({"provider": {"strata": provider}}, indent=2)
