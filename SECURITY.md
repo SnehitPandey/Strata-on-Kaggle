@@ -1,4 +1,4 @@
-# Security Policy
+# Security Policy (IMPORTENT)
 
 - Never commit Kaggle API tokens, Strata API keys, OpenCode credential files, model weights, runtime cache archives, or notebook output containing secrets.
 - Use Kaggle's Secrets manager for `KAGGLE_API_TOKEN` and `NGROK_AUTHTOKEN`. Enable each secret only for the notebook that requires it.
