@@ -60,10 +60,7 @@ The benefit is **persistence and reuse**: future sessions can restore from your 
 | **9 · Optional supervision** | Runs a six-hour health-monitoring cell that checks Strata and the tunnel authentication boundary. |
 
 ## 🧭 Quick links
-
-[![Open in Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://kaggle.com/kernels/welcome?src=https://github.com/SnehitPandey/Strata-on-Kaggle/blob/main/notebooks/Strata_Kaggle.ipynb)
-
-If the badge does not open the notebook import flow, go to [Kaggle Notebooks](https://www.kaggle.com/notebooks/welcome), choose **Load from URL**, and paste:
+Go to [Kaggle Notebooks](https://www.kaggle.com/notebooks/welcome), choose **Load from URL**, and paste:
 
 ```text
 https://github.com/SnehitPandey/Strata-on-Kaggle/blob/main/notebooks/Strata_Kaggle.ipynb
